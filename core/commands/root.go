@@ -62,24 +62,24 @@ Use 'ipfs <command> --help' to learn more about each command.
 var CommandsDaemonCmd = CommandsCmd(Root)
 
 var rootSubcommands = map[string]*cmds.Command{
-	"cat":       catCmd,
-	"ls":        lsCmd,
-	"commands":  CommandsDaemonCmd,
-	"name":      nameCmd,
 	"add":       addCmd,
-	"log":       LogCmd,
-	"diag":      DiagCmd,
-	"pin":       pinCmd,
-	"version":   VersionCmd,
-	"config":    configCmd,
-	"bootstrap": bootstrapCmd,
-	"mount":     mountCmd,
 	"block":     blockCmd,
-	"update":    UpdateCmd,
-	"object":    objectCmd,
-	"refs":      refsCmd,
+	"bootstrap": bootstrapCmd,
+	"cat":       catCmd,
+	"commands":  CommandsDaemonCmd,
+	"config":    configCmd,
+	"diag":      DiagCmd,
 	"id":        idCmd,
+	"log":       LogCmd,
+	"ls":        lsCmd,
+	"mount":     mountCmd,
+	"name":      nameCmd,
+	"object":    objectCmd,
+	"pin":       pinCmd,
+	"refs":      refsCmd,
 	"swarm":     swarmCmd,
+	"update":    UpdateCmd,
+	"version":   VersionCmd,
 }
 
 func init() {
