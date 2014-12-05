@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"syscall"
 
@@ -54,6 +55,7 @@ type cmdInvocation struct {
 // - output the response
 // - if anything fails, print error, maybe with help
 func main() {
+	setCPUAffinity()
 	ctx := context.Background()
 	var err error
 	var invoc cmdInvocation
@@ -512,4 +514,17 @@ func allInterruptSignals() chan os.Signal {
 	signal.Notify(sigc, syscall.SIGHUP, syscall.SIGINT,
 		syscall.SIGTERM, syscall.SIGQUIT)
 	return sigc
+}
+
+func setCPUAffinity() error {
+	runtime.GOMAXPROCS(func() int {
+		n := runtime.NumCPU()
+		switch n {
+		case 1:
+			return 1
+		default:
+			return n - 1
+		}
+	}())
+	return nil
 }
