@@ -200,7 +200,7 @@ func (s *Swarm) fanOut() {
 
 			i++
 			log.Debugf("%s sent message to %s (%d)", s.local, msg.Peer(), i)
-			log.Event(context.TODO(), "sendMessage", s.local, msg)
+			log.Event(context.TODO(), "sendMessage", s.local, msg.Peer(), msg)
 			// queue it in the connection's buffer
 			c.Out() <- msg.Data()
 		}
