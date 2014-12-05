@@ -221,7 +221,6 @@ func (s *Swarm) fanInSingle(c conn.Conn) {
 		c.Children().Done() // child of Conn as well.
 	}()
 
-	i := 0
 	for {
 		select {
 		case <-s.Closing(): // Swarm closing
@@ -235,8 +234,7 @@ func (s *Swarm) fanInSingle(c conn.Conn) {
 				log.Infof("%s in channel closed", c)
 				return // channel closed.
 			}
-			i++
-			log.Debugf("%s received message from %s (%d)", s.local, c.RemotePeer(), i)
+			log.Event(context.TODO(), "receivedMessage", s.local, c.RemotePeer())
 			s.Incoming <- msg.New(c.RemotePeer(), data)
 		}
 	}
