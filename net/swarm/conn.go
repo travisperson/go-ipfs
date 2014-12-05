@@ -190,10 +190,12 @@ func (s *Swarm) fanOut() {
 			s.connsLock.RUnlock()
 
 			if !found {
-				e := fmt.Errorf("Sent msg to peer without open conn: %v", msg.Peer())
-				s.errChan <- e
-				log.Error(e)
-				continue
+				_, err := s.Dial(msg.Peer())
+				if err != nil {
+					s.errChan <- err
+					log.Error(err)
+					continue
+				}
 			}
 
 			i++
