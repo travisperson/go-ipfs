@@ -162,7 +162,7 @@ func (dht *IpfsDHT) findProvidersAsyncRoutine(ctx context.Context, key u.Key, co
 	query := newQuery(key, dht.dialer, func(ctx context.Context, p peer.Peer) (*dhtQueryResult, error) {
 
 		pmes, err := dht.findProvidersSingle(ctx, p, key)
-		if err != nil {
+		if err != nil && err != routing.ErrNotFound {
 			return nil, err
 		}
 
