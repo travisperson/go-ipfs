@@ -21,7 +21,7 @@ data/filetiny: Makefile
 	cp Makefile ./data/filetiny # simple
 
 data/filerand: bin/random
-	./bin/random 50000000 > ./data/filerand
+	./bin/random 5000000 > ./data/filerand
 
 bin/random:
 	go build -o ./bin/random ../$(RANDOMSRC)
