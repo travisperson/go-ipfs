@@ -51,26 +51,25 @@ func (s *Server) handleMessage(
 
 	case dhtpb.Message_GET_VALUE:
 		dskey := util.Key(req.GetKey()).DsKey()
-		iVal, err := s.datastore.Get(dskey)
+		val, err := s.datastore.Get(dskey)
 		if err != nil {
 			log.Error(errors.Wrap(err))
 			return nil, nil
 		}
-		byts, ok := iVal.([]byte)
+		rawRecord, ok := val.([]byte)
 		if !ok {
 			log.Errorf("datastore had non byte-slice value for %v", dskey)
 			return nil, nil
 		}
-		if err := proto.Unmarshal(byts, response.Record); err != nil {
+		if err := proto.Unmarshal(rawRecord, response.Record); err != nil {
 			log.Error("failed to unmarshal dht record from datastore")
 			return nil, nil
 		}
-		// TODO if we know any providers for the requested value, return those.
+		// TODO before merging: if we know any providers for the requested value, return those.
 		return p, response
 
 	case dhtpb.Message_PUT_VALUE:
-		// TODO err := dht.verifyRecord(req.GetRecord())
-
+		// TODO before merging: verifyRecord(req.GetRecord())
 		data, err := proto.Marshal(req.GetRecord())
 		if err != nil {
 			log.Error(err)
@@ -81,41 +80,37 @@ func (s *Server) handleMessage(
 			log.Error(err)
 			return nil, nil
 		}
-		return p, req // TODO verify that we should return record?
+		return p, req // TODO before merging: verify that we should return record
 
 	case dhtpb.Message_FIND_NODE:
-		var peers []peer.Peer
 		p, err := s.peerstore.Get(peer.ID(req.GetKey()))
 		if err != nil {
 			return nil, nil
 		}
-		peers = []peer.Peer{p}
-		response.CloserPeers = dhtpb.PeersToPBPeers(s.dialer, peers)
+		response.CloserPeers = dhtpb.PeersToPBPeers(s.dialer, []peer.Peer{p})
 		return p, response
 
 	case dhtpb.Message_ADD_PROVIDER:
-
-		for _, cur := range req.GetProviderPeers() {
-			curID := peer.ID(cur.GetId())
-			if curID.Equal(p.ID()) {
-				maddrs, err := cur.Addresses()
-				if err != nil {
-					log.Errorf("failed to extract multiaddrs from message: %s", cur.Addrs)
-					continue
-				}
-				for _, maddr := range maddrs {
-					p.AddAddress(maddr)
-				}
-				// FIXME do we actually want to store to peerstore
-				if _, err := s.peerstore.Add(p); err != nil {
-					log.Error(errors.Wrap(err))
-					return nil, nil
-				}
-			} else {
+		for _, provider := range req.GetProviderPeers() {
+			providerID := peer.ID(provider.GetId())
+			if !providerID.Equal(p.ID()) {
 				log.Errorf("provider message came from third-party %s", p)
+				continue
+			}
+			maddrs, err := provider.Addresses()
+			if err != nil {
+				log.Errorf("failed to extract multiaddrs from message: %s", provider.Addrs)
+				continue
+			}
+			for _, maddr := range maddrs {
+				p.AddAddress(maddr)
+			}
+			// FIXME do we actually want to store to peerstore
+			if _, err := s.peerstore.Add(p); err != nil {
+				log.Error(errors.Wrap(err))
+				return nil, nil
 			}
 		}
-
 		// TODO store to datastore? what format?
 		// key := util.Key(req.GetKey())
 		return nil, nil // TODO
