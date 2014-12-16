@@ -10,6 +10,7 @@ import (
 
 // Peerstore provides a threadsafe collection for peers.
 type Peerstore interface {
+	Get(ID) (Peer, error)
 	FindOrCreate(ID) (Peer, error)
 	Add(Peer) (Peer, error)
 	Delete(ID) error
@@ -32,6 +33,23 @@ func NewPeerstore() Peerstore {
 	}
 }
 
+// Get returns the peer corresponding to the given ID or an error if the peer
+// is not present.
+func (ps *peerstore) Get(i ID) (Peer, error) {
+	ps.Lock()
+	defer ps.Unlock()
+	if i == nil {
+		return nil, errors.New("peerstore: invalid argument")
+	}
+	p, ok := ps.data[i.String()]
+	if !ok {
+		return nil, errors.Errorf("peerstore: peer %s not present", i)
+	}
+	return p, nil
+}
+
+// FindOrCreate returns the peer corresponding to the given ID, creating one if
+// not already present.
 func (ps *peerstore) FindOrCreate(i ID) (Peer, error) {
 	ps.Lock()
 	defer ps.Unlock()
