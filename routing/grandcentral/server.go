@@ -5,7 +5,6 @@ import (
 	proto "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/goprotobuf/proto"
 	datastore "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
 	inet "github.com/jbenet/go-ipfs/net"
-	msg "github.com/jbenet/go-ipfs/net/message"
 	peer "github.com/jbenet/go-ipfs/peer"
 	dhtpb "github.com/jbenet/go-ipfs/routing/dht/pb"
 	proxy "github.com/jbenet/go-ipfs/routing/grandcentral/proxy"
@@ -13,31 +12,30 @@ import (
 	errors "github.com/jbenet/go-ipfs/util/debugerror"
 )
 
+// Server handles routing queries using a database backend
 type Server struct {
-	local     peer.Peer
-	datastore datastore.ThreadSafeDatastore
-	dialer    inet.Dialer
-	peerstore peer.Peerstore
-	*proxy.Loopback
+	local           peer.Peer
+	datastore       datastore.ThreadSafeDatastore
+	dialer          inet.Dialer
+	peerstore       peer.Peerstore
+	*proxy.Loopback // so server can be injected into client
 }
 
+// NewServer creates a new GrandCentral routing Server
 func NewServer(ds datastore.ThreadSafeDatastore, d inet.Dialer, ps peer.Peerstore, local peer.Peer) (*Server, error) {
 	s := &Server{local, ds, d, ps, nil}
 	s.Loopback = &proxy.Loopback{
 		Handler: s,
+		Local:   local,
 	}
 	return s, nil
 }
 
-// TODO doc
-func (s *Server) HandleLocalRequest(ctx context.Context, req *dhtpb.Message) *dhtpb.Message {
-	_, response := s.handleMessage(ctx, s.local, req) // ignore response peer. it's local.
+// HandleLocalRequest implements the proxy.RequestHandler interface. This is
+// where requests are received from the outside world.
+func (s *Server) HandleRequest(ctx context.Context, p peer.Peer, req *dhtpb.Message) *dhtpb.Message {
+	_, response := s.handleMessage(ctx, p, req) // ignore response peer. it's local.
 	return response
-}
-
-// HandleMessage implements the IPFS Network Receiver interface.
-func (s *Server) HandleMessage(ctx context.Context, raw msg.NetMessage) msg.NetMessage {
-	return proxy.Func(ctx, raw, s.handleMessage)
 }
 
 // TODO extract backend. backend can be implemented with whatever database we desire
@@ -135,8 +133,5 @@ func (s *Server) handleMessage(
 	return nil, nil
 }
 
-var _ inet.Handler = &Server{}
 var _ proxy.RequestHandler = &Server{}
-
-type Backend interface {
-}
+var _ proxy.Proxy = &Server{}
