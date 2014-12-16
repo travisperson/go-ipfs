@@ -2,6 +2,9 @@ package proxy
 
 import (
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
+	proto "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/goprotobuf/proto"
+	errors "github.com/jbenet/go-ipfs/util/debugerror"
+	netmsg "github.com/jbenet/go-ipfs/net/message"
 	dhtpb "github.com/jbenet/go-ipfs/routing/dht/pb"
 )
 
@@ -27,4 +30,19 @@ func (lb *Loopback) SendMessage(ctx context.Context, m *dhtpb.Message) error {
 // SendRequest intercepts local requests, forwarding them to a local handler
 func (lb *Loopback) SendRequest(ctx context.Context, m *dhtpb.Message) (*dhtpb.Message, error) {
 	return lb.Handler.HandleLocalRequest(ctx, m), nil
+}
+
+func (lb *Loopback) HandleMessage(ctx context.Context, raw netmsg.NetMessage) netmsg.NetMessage {
+	var incoming dhtpb.Message // var avoids heap allocation since message doesn't leave this scope
+	if err := proto.Unmarshal(raw.Data(), &incoming); err != nil {
+		log.Error(errors.Wrap(err))
+		return nil
+	}
+	outgoing := lb.Handler.HandleLocalRequest(ctx, &incoming)
+	envelope, err := netmsg.FromObject(raw.Peer(), outgoing)
+	if err != nil {
+		log.Error(errors.Wrap(err))
+		return nil
+	}
+	return envelope
 }

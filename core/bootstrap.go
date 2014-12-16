@@ -10,7 +10,6 @@ import (
 	config "github.com/jbenet/go-ipfs/config"
 	inet "github.com/jbenet/go-ipfs/net"
 	peer "github.com/jbenet/go-ipfs/peer"
-	dht "github.com/jbenet/go-ipfs/routing/dht"
 	math2 "github.com/jbenet/go-ipfs/util/math2"
 )
 
@@ -22,7 +21,6 @@ const (
 
 func superviseConnections(parent context.Context,
 	n inet.Network,
-	route *dht.IpfsDHT, // TODO depend on abstract interface for testing purposes
 	store peer.Peerstore,
 	peers []*config.BootstrapPeer) error {
 
@@ -30,7 +28,7 @@ func superviseConnections(parent context.Context,
 		ctx, _ := context.WithTimeout(parent, connectiontimeout)
 		// TODO get config from disk so |peers| always reflects the latest
 		// information
-		if err := bootstrap(ctx, n, route, store, peers); err != nil {
+		if err := bootstrap(ctx, n, store, peers); err != nil {
 			log.Error(err)
 		}
 		select {
@@ -44,7 +42,6 @@ func superviseConnections(parent context.Context,
 
 func bootstrap(ctx context.Context,
 	n inet.Network,
-	r *dht.IpfsDHT,
 	ps peer.Peerstore,
 	boots []*config.BootstrapPeer) error {
 
@@ -70,13 +67,13 @@ func bootstrap(ctx context.Context,
 	}
 
 	var randomSubset = randomSubsetOfPeers(notConnected, numCxnsToCreate)
-	if err := connect(ctx, r, randomSubset); err != nil {
+	if err := connect(ctx, n, randomSubset); err != nil {
 		return err
 	}
 	return nil
 }
 
-func connect(ctx context.Context, r *dht.IpfsDHT, peers []peer.Peer) error {
+func connect(ctx context.Context, dialer inet.Dialer, peers []peer.Peer) error {
 	var wg sync.WaitGroup
 	for _, p := range peers {
 
@@ -87,8 +84,7 @@ func connect(ctx context.Context, r *dht.IpfsDHT, peers []peer.Peer) error {
 		wg.Add(1)
 		go func(p peer.Peer) {
 			defer wg.Done()
-			err := r.Connect(ctx, p)
-			if err != nil {
+			if err := dialer.DialPeer(ctx, p); err != nil {
 				log.Event(ctx, "bootstrapFailed", p)
 				log.Criticalf("failed to bootstrap with %v", p)
 				return

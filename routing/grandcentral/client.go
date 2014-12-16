@@ -6,7 +6,6 @@ import (
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
 	proto "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/goprotobuf/proto"
 	inet "github.com/jbenet/go-ipfs/net"
-	netmsg "github.com/jbenet/go-ipfs/net/message"
 	peer "github.com/jbenet/go-ipfs/peer"
 	routing "github.com/jbenet/go-ipfs/routing"
 	pb "github.com/jbenet/go-ipfs/routing/dht/pb"
@@ -111,12 +110,6 @@ func (c *Client) FindPeer(ctx context.Context, id peer.ID) (peer.Peer, error) {
 	return nil, errors.New("could not find peer")
 }
 
-func (c *Client) HandleMessage(ctx context.Context, mes netmsg.NetMessage) netmsg.NetMessage {
-	log.Info("dropped unsolicited routing message")
-	return nil
-	// errors.New("client does not respond to routing messages")
-}
-
 // creates and signs a record for the given key/value pair
 func makeRecord(p peer.Peer, k u.Key, v []byte) (*pb.Record, error) {
 	blob := bytes.Join([][]byte{[]byte(k), v, []byte(p.ID())}, []byte{})
@@ -133,4 +126,3 @@ func makeRecord(p peer.Peer, k u.Key, v []byte) (*pb.Record, error) {
 }
 
 var _ routing.IpfsRouting = &Client{}
-var _ inet.Handler = &Client{}

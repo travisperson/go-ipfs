@@ -18,10 +18,15 @@ type Server struct {
 	datastore datastore.ThreadSafeDatastore
 	dialer    inet.Dialer
 	peerstore peer.Peerstore
+	*proxy.Loopback
 }
 
 func NewServer(ds datastore.ThreadSafeDatastore, d inet.Dialer, ps peer.Peerstore, local peer.Peer) (*Server, error) {
-	return &Server{local, ds, d, ps}, nil
+	s := &Server{local, ds, d, ps, nil}
+	s.Loopback = &proxy.Loopback{
+		Handler: s,
+	}
+	return s, nil
 }
 
 // TODO doc
@@ -35,7 +40,7 @@ func (s *Server) HandleMessage(ctx context.Context, raw msg.NetMessage) msg.NetM
 	return proxy.Func(ctx, raw, s.handleMessage)
 }
 
-// TODO doc
+// TODO extract backend. backend can be implemented with whatever database we desire
 func (s *Server) handleMessage(
 	ctx context.Context, p peer.Peer, req *dhtpb.Message) (peer.Peer, *dhtpb.Message) {
 

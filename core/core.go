@@ -27,7 +27,8 @@ import (
 	peer "github.com/jbenet/go-ipfs/peer"
 	pin "github.com/jbenet/go-ipfs/pin"
 	routing "github.com/jbenet/go-ipfs/routing"
-	dht "github.com/jbenet/go-ipfs/routing/dht"
+	grandcentral "github.com/jbenet/go-ipfs/routing/grandcentral"
+	gcproxy "github.com/jbenet/go-ipfs/routing/grandcentral/proxy"
 	ctxc "github.com/jbenet/go-ipfs/util/ctxcloser"
 	ds2 "github.com/jbenet/go-ipfs/util/datastore2"
 	debugerror "github.com/jbenet/go-ipfs/util/debugerror"
@@ -135,12 +136,12 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (n *IpfsN
 	// setup online services
 	if online {
 
-		dhtService := netservice.NewService(ctx, nil)      // nil handler for now, need to patch it
+		routingService := netservice.NewService(ctx, nil)  // nil handler for now, need to patch it
 		exchangeService := netservice.NewService(ctx, nil) // nil handler for now, need to patch it
 		diagService := netservice.NewService(ctx, nil)     // nil handler for now, need to patch it
 
 		muxMap := &mux.ProtocolMap{
-			mux.ProtocolID_Routing:    dhtService,
+			mux.ProtocolID_Routing:    routingService,
 			mux.ProtocolID_Exchange:   exchangeService,
 			mux.ProtocolID_Diagnostic: diagService,
 			// add protocol services here.
@@ -162,14 +163,31 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (n *IpfsN
 		n.Diagnostics = diag.NewDiagnostics(n.Identity, n.Network, diagService)
 		diagService.SetHandler(n.Diagnostics)
 
-		// setup routing service
-		dhtRouting := dht.NewDHT(ctx, n.Identity, n.Peerstore, n.Network, dhtService, n.Datastore)
-		dhtRouting.Validators[IpnsValidatorTag] = namesys.ValidateIpnsRecord
+		// px acts as a network interface for the routing client. In server
+		// mode, calls are handled locally. In client mode, the routingService
+		// sends requests to the remote host.
+		var px gcproxy.Proxy
+		var configRoutingServer bool // TODO pass this in as argument
+		if configRoutingServer {
+			// in server mode, forward calls to this local database server from
+			// the routing client using the loopback proxy
+			px, err = grandcentral.NewServer(n.Datastore, n.Network, n.Peerstore, n.Identity)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// if in client mode, forward calls to remoteRoutingServer over the
+			// routingService
+			var remoteRoutingServer peer.Peer // TODO FIXME pick a remote and set up a peer
+			px = gcproxy.Standard(routingService, remoteRoutingServer)
+		}
 
-		// TODO(brian): perform this inside NewDHT factory method
-		dhtService.SetHandler(dhtRouting) // wire the handler to the service.
-		n.Routing = dhtRouting
-		n.AddCloserChild(dhtRouting)
+		routingService.SetHandler(px)
+
+		n.Routing, err = grandcentral.NewClient(n.Network, px, n.Peerstore, n.Identity)
+		if err != nil {
+			return nil, err
+		}
 
 		// setup exchange service
 		const alwaysSendToPeer = true // use YesManStrategy
@@ -183,7 +201,7 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (n *IpfsN
 		// an Exchange, Network, or Routing component and have the constructor
 		// manage the wiring. In that scenario, this dangling function is a bit
 		// awkward.
-		go superviseConnections(ctx, n.Network, dhtRouting, n.Peerstore, n.Config.Bootstrap)
+		go superviseConnections(ctx, n.Network, n.Peerstore, n.Config.Bootstrap)
 	}
 
 	// TODO(brian): when offline instantiate the BlockService with a bitswap

@@ -16,14 +16,19 @@ var log = eventlog.Logger("proxy")
 type Proxy interface {
 	SendMessage(ctx context.Context, m *dhtpb.Message) error
 	SendRequest(ctx context.Context, m *dhtpb.Message) (*dhtpb.Message, error)
+	HandleMessage(ctx context.Context, raw netmsg.NetMessage) netmsg.NetMessage
 }
 
-type Standard struct {
+type standard struct {
 	NetMessageSender inet.Sender
 	Remote           peer.Peer
 }
 
-func (px *Standard) SendMessage(ctx context.Context, m *dhtpb.Message) error {
+func Standard(s inet.Sender, remote peer.Peer) Proxy {
+	return &standard{s, remote}
+}
+
+func (px *standard) SendMessage(ctx context.Context, m *dhtpb.Message) error {
 	envelope, err := netmsg.FromObject(px.Remote, m)
 	if err != nil {
 		return errors.Wrap(err)
@@ -31,7 +36,7 @@ func (px *Standard) SendMessage(ctx context.Context, m *dhtpb.Message) error {
 	return px.NetMessageSender.SendMessage(ctx, envelope)
 }
 
-func (px *Standard) SendRequest(ctx context.Context, m *dhtpb.Message) (*dhtpb.Message, error) {
+func (px *standard) SendRequest(ctx context.Context, m *dhtpb.Message) (*dhtpb.Message, error) {
 	envelope, err := netmsg.FromObject(px.Remote, m)
 	if err != nil {
 		return nil, errors.Wrap(err)
@@ -45,6 +50,11 @@ func (px *Standard) SendRequest(ctx context.Context, m *dhtpb.Message) (*dhtpb.M
 		return nil, errors.Wrap(err)
 	}
 	return response, nil
+}
+
+func (lb *standard) HandleMessage(ctx context.Context, raw netmsg.NetMessage) netmsg.NetMessage {
+	// ignore messages coming in from network
+	return nil // TODO consider forwarding message to host
 }
 
 func Func(ctx context.Context, raw netmsg.NetMessage, f func(context.Context, peer.Peer, *dhtpb.Message) (peer.Peer, *dhtpb.Message)) netmsg.NetMessage {
