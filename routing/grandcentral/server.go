@@ -111,16 +111,35 @@ func (s *Server) handleMessage(
 				return nil, nil
 			}
 		}
-		// TODO store to datastore? what format?
-		// key := util.Key(req.GetKey())
-		return nil, nil // TODO
+		var providers []dhtpb.Message_Peer
+		pkey := datastore.KeyWithNamespaces([]string{"routing", "providers", req.GetKey()})
+		if v, err := s.datastore.Get(pkey); err == nil {
+			if protopeers, ok := v.([]dhtpb.Message_Peer); ok {
+				providers = append(providers, protopeers...)
+			}
+		}
+		if err := s.datastore.Put(pkey, providers); err != nil {
+			log.Error(err)
+			return nil, nil
+		}
+		return nil, nil
 
 	case dhtpb.Message_GET_PROVIDERS:
-
-		// TODO how do we want to persist peers? FIXME along with
-		// Message_ADD_PROVIDER.
-
-		return nil, nil // TODO
+		dskey := util.Key(req.GetKey()).DsKey()
+		exists, err := s.datastore.Has(dskey)
+		if err == nil && exists {
+			response.ProviderPeers = append(response.ProviderPeers, dhtpb.PeersToPBPeers(s.dialer, []peer.Peer{s.local})...)
+		}
+		// FIXME(btc) is this how we want to persist this data?
+		pkey := datastore.KeyWithNamespaces([]string{"routing", "providers", req.GetKey()})
+		if v, err := s.datastore.Get(pkey); err == nil {
+			if protopeers, ok := v.([]dhtpb.Message_Peer); ok {
+				for _, p := range protopeers {
+					response.ProviderPeers = append(response.ProviderPeers, &p)
+				}
+			}
+		}
+		return p, response
 
 	case dhtpb.Message_PING:
 		return p, req
