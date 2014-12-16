@@ -85,7 +85,7 @@ func (s *Server) handleMessage(
 
 	case dhtpb.Message_FIND_NODE:
 		var peers []peer.Peer
-		p, err := s.peerstore.FindOrCreate(peer.ID(req.GetKey())) // FIXME do this without lazily creating
+		p, err := s.peerstore.Get(peer.ID(req.GetKey()))
 		if err != nil {
 			return nil, nil
 		}
