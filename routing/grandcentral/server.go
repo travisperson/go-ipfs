@@ -118,16 +118,17 @@ func (s *Server) handleMessage(
 
 		// TODO store to datastore? what format?
 		// key := util.Key(req.GetKey())
-
 		return nil, nil // TODO
+
 	case dhtpb.Message_GET_PROVIDERS:
 
 		// TODO how do we want to persist peers? FIXME along with
 		// Message_ADD_PROVIDER.
 
 		return nil, nil // TODO
+
 	case dhtpb.Message_PING:
-		return nil, nil // TODO
+		return p, req
 	default:
 	}
 	return nil, nil
