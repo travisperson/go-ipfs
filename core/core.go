@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
@@ -73,6 +74,34 @@ type IpfsNode struct {
 type Mounts struct {
 	Ipfs mount.Mount
 	Ipns mount.Mount
+}
+
+func NewIpfsNodeDeprecated(ctx context.Context, cfg *config.Config, online bool) (*IpfsNode, error) {
+	if online {
+		return New(ctx, Online(cfg))
+	}
+	return New(ctx, Offline(cfg))
+}
+
+func Online(*config.Config) ConfigOption {
+	return func(context.Context) Configuration {
+		return nil // TODO
+	}
+}
+
+func Offline(*config.Config) ConfigOption {
+	return func(context.Context) Configuration {
+		return nil // TODO
+	}
+}
+
+type ConfigOption func(context.Context) Configuration
+
+type Configuration interface {
+}
+
+func New(ctx context.Context, c ConfigOption) (*IpfsNode, error) {
+	return nil, errors.New("TODO")
 }
 
 // NewIpfsNode constructs a new IpfsNode based on the given config.
