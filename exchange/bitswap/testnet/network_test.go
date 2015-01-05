@@ -45,24 +45,32 @@ func TestSendRequestToCooperativePeer(t *testing.T) {
 
 	message := bsmsg.New()
 	message.AddBlock(blocks.NewBlock([]byte("data")))
-	response, err := initiator.SendRequest(
+	initiator.SetDelegate(bsnet.ReceiverFunc(func(
+		ctx context.Context,
+		from peer.ID,
+		response bsmsg.BitSwapMessage) (
+		peer.ID, bsmsg.BitSwapMessage) {
+
+		t.Log("Check the contents of the response from recipient")
+
+		if response == nil {
+			t.Fatal("Should have received a response")
+		}
+
+		for _, blockFromRecipient := range response.Blocks() {
+			if string(blockFromRecipient.Data) == expectedStr {
+				return "", nil
+			}
+		}
+		t.Fatal("Should have returned after finding expected block data")
+
+		return "", nil
+	}))
+	err := initiator.SendMessage(
 		context.Background(), recipientPeer.ID(), message)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Log("Check the contents of the response from recipient")
-
-	if response == nil {
-		t.Fatal("Should have received a response")
-	}
-
-	for _, blockFromRecipient := range response.Blocks() {
-		if string(blockFromRecipient.Data) == expectedStr {
-			return
-		}
-	}
-	t.Fatal("Should have returned after finding expected block data")
 }
 
 func TestSendMessageAsyncButWaitForResponse(t *testing.T) {

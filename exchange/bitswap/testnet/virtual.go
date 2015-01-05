@@ -106,7 +106,6 @@ func (n *network) SendRequest(
 
 	// TODO dedupe code
 	if (nextPeer == "" && nextMsg != nil) || (nextMsg == nil && nextPeer != "") {
-		r.ReceiveError(errors.New("Malformed client request"))
 		return nil, nil
 	}
 
