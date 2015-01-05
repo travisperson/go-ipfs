@@ -84,23 +84,27 @@ func NewIpfsNodeDeprecated(ctx context.Context, cfg *config.Config, online bool)
 }
 
 func Online(*config.Config) ConfigOption {
-	return func(context.Context) Configuration {
-		return nil // TODO
+	return func(context.Context) (Configuration, error) {
+		return nil, errors.New("TODO")
 	}
 }
 
 func Offline(*config.Config) ConfigOption {
-	return func(context.Context) Configuration {
-		return nil // TODO
+	return func(context.Context) (Configuration, error) {
+		return nil, errors.New("TODO")
 	}
 }
 
-type ConfigOption func(context.Context) Configuration
+type ConfigOption func(context.Context) (Configuration, error)
 
 type Configuration interface {
 }
 
-func New(ctx context.Context, c ConfigOption) (*IpfsNode, error) {
+func New(ctx context.Context, f ConfigOption) (*IpfsNode, error) {
+	_, err := f(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return nil, errors.New("TODO")
 }
 
