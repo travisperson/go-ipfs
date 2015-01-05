@@ -95,10 +95,8 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (n *IpfsN
 	n.ContextGroup = ctxgroup.WithContextAndTeardown(ctx, n.teardown)
 	ctx = n.ContextGroup.Context()
 
-	// setup Peerstore
 	n.Peerstore = peer.NewPeerstore()
 
-	// setup datastore.
 	if n.Datastore, err = makeDatastore(cfg.Datastore); err != nil {
 		return nil, debugerror.Wrap(err)
 	}
@@ -113,7 +111,6 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (n *IpfsN
 		return nil, debugerror.Wrap(err)
 	}
 
-	// setup online services
 	if online {
 		if err := n.StartOnlineServices(); err != nil {
 			return nil, err // debugerror.Wraps.
