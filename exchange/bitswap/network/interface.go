@@ -36,10 +36,26 @@ type BitSwapNetwork interface {
 // Implement Receiver to receive messages from the BitSwapNetwork
 type Receiver interface {
 	ReceiveMessage(
-		ctx context.Context, sender peer.ID, incoming bsmsg.BitSwapMessage) (
-		destination peer.ID, outgoing bsmsg.BitSwapMessage)
+		ctx context.Context,
+		sender peer.ID,
+		incoming bsmsg.BitSwapMessage,
+	) (destination peer.ID, outgoing bsmsg.BitSwapMessage)
+}
 
-	ReceiveError(error)
+// The ReceiverFunc type is an adapter to allow the use of ordinary functions
+// as Receivers. If f is a function with the appropriate signature,
+// ReceiverFunc(f) is a Receiver object that calls f.
+type ReceiverFunc func(
+	ctx context.Context,
+	sender peer.ID,
+	incoming bsmsg.BitSwapMessage) (destination peer.ID, outgoing bsmsg.BitSwapMessage)
+
+// ReceiveMessage calls f(ctx, sender, incoming)
+func (f ReceiverFunc) ReceiveMessage(
+	ctx context.Context,
+	sender peer.ID,
+	incoming bsmsg.BitSwapMessage) (destination peer.ID, outgoing bsmsg.BitSwapMessage) {
+	return f(ctx, sender, incoming)
 }
 
 type Routing interface {

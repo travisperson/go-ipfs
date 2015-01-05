@@ -25,7 +25,7 @@ func TestSendRequestToCooperativePeer(t *testing.T) {
 	recipient := net.Adapter(recipientPeer)
 
 	expectedStr := "response from recipient"
-	recipient.SetDelegate(lambda(func(
+	recipient.SetDelegate(bsnet.ReceiverFunc(func(
 		ctx context.Context,
 		from peer.ID,
 		incoming bsmsg.BitSwapMessage) (
@@ -77,7 +77,7 @@ func TestSendMessageAsyncButWaitForResponse(t *testing.T) {
 
 	expectedStr := "received async"
 
-	responder.SetDelegate(lambda(func(
+	responder.SetDelegate(bsnet.ReceiverFunc(func(
 		ctx context.Context,
 		fromWaiter peer.ID,
 		msgFromWaiter bsmsg.BitSwapMessage) (
@@ -89,7 +89,7 @@ func TestSendMessageAsyncButWaitForResponse(t *testing.T) {
 		return fromWaiter, msgToWaiter
 	}))
 
-	waiter.SetDelegate(lambda(func(
+	waiter.SetDelegate(bsnet.ReceiverFunc(func(
 		ctx context.Context,
 		fromResponder peer.ID,
 		msgFromResponder bsmsg.BitSwapMessage) (
@@ -120,29 +120,4 @@ func TestSendMessageAsyncButWaitForResponse(t *testing.T) {
 	}
 
 	wg.Wait() // until waiter delegate function is executed
-}
-
-type receiverFunc func(ctx context.Context, p peer.ID,
-	incoming bsmsg.BitSwapMessage) (peer.ID, bsmsg.BitSwapMessage)
-
-// lambda returns a Receiver instance given a receiver function
-func lambda(f receiverFunc) bsnet.Receiver {
-	return &lambdaImpl{
-		f: f,
-	}
-}
-
-type lambdaImpl struct {
-	f func(ctx context.Context, p peer.ID, incoming bsmsg.BitSwapMessage) (
-		peer.ID, bsmsg.BitSwapMessage)
-}
-
-func (lam *lambdaImpl) ReceiveMessage(ctx context.Context,
-	p peer.ID, incoming bsmsg.BitSwapMessage) (
-	peer.ID, bsmsg.BitSwapMessage) {
-	return lam.f(ctx, p, incoming)
-}
-
-func (lam *lambdaImpl) ReceiveError(err error) {
-	// TODO log error
 }
