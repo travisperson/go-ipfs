@@ -2,20 +2,9 @@ package core
 
 import (
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
-
-	ds "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
-	syncds "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore/sync"
-	"github.com/jbenet/go-ipfs/blocks/blockstore"
-	blockservice "github.com/jbenet/go-ipfs/blockservice"
-	"github.com/jbenet/go-ipfs/exchange/offline"
-	mdag "github.com/jbenet/go-ipfs/merkledag"
-	nsys "github.com/jbenet/go-ipfs/namesys"
+	core_testutil "github.com/jbenet/go-ipfs/core/testutil"
 	mocknet "github.com/jbenet/go-ipfs/p2p/net/mock"
-	peer "github.com/jbenet/go-ipfs/p2p/peer"
-	path "github.com/jbenet/go-ipfs/path"
-	mockrouting "github.com/jbenet/go-ipfs/routing/mock"
-	ds2 "github.com/jbenet/go-ipfs/util/datastore2"
-	testutil "github.com/jbenet/go-ipfs/util/testutil"
+	errors "github.com/jbenet/go-ipfs/util/debugerror"
 )
 
 // TODO this is super sketch. Deprecate and initialize one that shares code
@@ -24,48 +13,12 @@ import (
 
 // NewMockNode constructs an IpfsNode for use in tests.
 func NewMockNode() (*IpfsNode, error) {
+	conf := core_testutil.LatencyConfig{}
 	ctx := context.TODO()
-	nd := new(IpfsNode)
-
-	// Generate Identity
-	ident, err := testutil.RandIdentity()
+	mn, err := mocknet.FullMeshLinked(ctx, 1)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err)
 	}
-
-	p := ident.ID()
-	nd.Identity = p
-	nd.PrivateKey = ident.PrivateKey()
-	nd.Peerstore = peer.NewPeerstore()
-	nd.Peerstore.AddPrivKey(p, ident.PrivateKey())
-	nd.Peerstore.AddPubKey(p, ident.PublicKey())
-
-	nd.PeerHost, err = mocknet.New(ctx).AddPeer(ident.PrivateKey(), ident.Address()) // effectively offline
-	if err != nil {
-		return nil, err
-	}
-
-	// Temp Datastore
-	dstore := ds.NewMapDatastore()
-	nd.Datastore = ds2.CloserWrap(syncds.MutexWrap(dstore))
-
-	// Routing
-	nd.Routing = mockrouting.NewServer().Client(ident)
-
-	// Bitswap
-	bstore := blockstore.NewBlockstore(nd.Datastore)
-	bserv, err := blockservice.New(bstore, offline.Exchange(bstore))
-	if err != nil {
-		return nil, err
-	}
-
-	nd.DAG = mdag.NewDAGService(bserv)
-
-	// Namespace resolver
-	nd.Namesys = nsys.NewNameSystem(nd.Routing)
-
-	// Path resolver
-	nd.Resolver = &path.Resolver{DAG: nd.DAG}
-
-	return nd, nil
+	peers := mn.Peers()
+	return New(ctx, MocknetTestRepo(peers[0], mn.Host(peers[0]), conf))
 }

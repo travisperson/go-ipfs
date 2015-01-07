@@ -31,9 +31,20 @@ import (
 	delay "github.com/jbenet/go-ipfs/util/delay"
 )
 
-// mock network, dht, bitswap
-// p2p network, grandcentral, bitswap
-//
+type Config func(ctx context.Context) (Configuration, error)
+
+type Configuration interface {
+	ID() peer.ID
+	Exchange() exchange.Interface
+	OnlineMode() bool
+	Peerstore() peer.Peerstore
+	Blockstore() blockstore.Blockstore
+	Datastore() ds2.ThreadSafeDatastoreCloser
+	// TODO if configID == "" { return debugerror.New("Identity was not set in config (was ipfs init run?)") }
+	// TODO if len(configID) == 0 { return debugerror.New("No peer ID in config! (was ipfs init run?)") }
+
+	Bootstrap(ctx context.Context, peer peer.ID) error
+}
 
 func Online(cfg *config.Config) Config {
 	// TODO load private key
@@ -117,45 +128,6 @@ func Offline(cfg *config.Config) Config {
 	}
 }
 
-type Configuration interface {
-	ID() peer.ID
-	Exchange() exchange.Interface
-	OnlineMode() bool
-	Peerstore() peer.Peerstore
-	Blockstore() blockstore.Blockstore
-	Datastore() ds2.ThreadSafeDatastoreCloser
-	// TODO if configID == "" { return debugerror.New("Identity was not set in config (was ipfs init run?)") }
-	// TODO if len(configID) == 0 { return debugerror.New("No peer ID in config! (was ipfs init run?)") }
-
-	Bootstrap(ctx context.Context, peer peer.ID) error
-}
-
-type Config func(ctx context.Context) (Configuration, error)
-
-type configuration struct {
-	// DHT, Exchange, Network,Datastore
-	bitSwapNetwork bsnet.BitSwapNetwork
-	blockstore     blockstore.Blockstore
-	exchange       exchange.Interface
-	datastore      ds2.ThreadSafeDatastoreCloser
-	host           host.Host
-	dht            *dht.IpfsDHT
-	id             peer.ID
-
-	online           bool
-	peerstore        peer.Peerstore
-	diagnoticService *diag.Diagnostics
-	nameSystem       namesys.NameSystem
-}
-
-func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error { return c.dht.Connect(ctx, p) }
-func (d *configuration) OnlineMode() bool                               { return d.online }
-func (d *configuration) Peerstore() peer.Peerstore                      { return d.peerstore }
-func (r *configuration) Blockstore() blockstore.Blockstore              { return r.blockstore }
-func (r *configuration) Datastore() ds2.ThreadSafeDatastoreCloser       { return r.datastore }
-func (r *configuration) Exchange() exchange.Interface                   { return r.exchange }
-func (r *configuration) ID() peer.ID                                    { return r.id }
-
 func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) Config {
 	return func(ctx context.Context) (Configuration, error) {
 		const kWriteCacheElems = 100
@@ -215,3 +187,27 @@ func listenAddresses(cfg *config.Config) ([]ma.Multiaddr, error) {
 
 	return listen, nil
 }
+
+type configuration struct {
+	// DHT, Exchange, Network,Datastore
+	bitSwapNetwork bsnet.BitSwapNetwork
+	blockstore     blockstore.Blockstore
+	exchange       exchange.Interface
+	datastore      ds2.ThreadSafeDatastoreCloser
+	host           host.Host
+	dht            *dht.IpfsDHT
+	id             peer.ID
+
+	online           bool
+	peerstore        peer.Peerstore
+	diagnoticService *diag.Diagnostics
+	nameSystem       namesys.NameSystem
+}
+
+func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error { return c.dht.Connect(ctx, p) }
+func (d *configuration) OnlineMode() bool                               { return d.online }
+func (d *configuration) Peerstore() peer.Peerstore                      { return d.peerstore }
+func (r *configuration) Blockstore() blockstore.Blockstore              { return r.blockstore }
+func (r *configuration) Datastore() ds2.ThreadSafeDatastoreCloser       { return r.datastore }
+func (r *configuration) Exchange() exchange.Interface                   { return r.exchange }
+func (r *configuration) ID() peer.ID                                    { return r.id }
