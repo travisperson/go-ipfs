@@ -7,12 +7,14 @@ import (
 	"testing"
 
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
+	core "github.com/jbenet/go-ipfs/core"
+	core_testutil "github.com/jbenet/go-ipfs/core/testutil"
 	mocknet "github.com/jbenet/go-ipfs/p2p/net/mock"
 	errors "github.com/jbenet/go-ipfs/util/debugerror"
 )
 
 func TestThreeLeggedCat(t *testing.T) {
-	conf := Config{
+	conf := core_testutil.LatencyConfig{
 		NetworkLatency:    0,
 		RoutingLatency:    0,
 		BlockstoreLatency: 0,
@@ -22,7 +24,7 @@ func TestThreeLeggedCat(t *testing.T) {
 	}
 }
 
-func RunThreeLeggedCat(data []byte, conf Config) error {
+func RunThreeLeggedCat(data []byte, conf core_testutil.LatencyConfig) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	const numPeers = 3
@@ -42,15 +44,15 @@ func RunThreeLeggedCat(data []byte, conf Config) error {
 	if len(peers) < numPeers {
 		return errors.New("test initialization error")
 	}
-	adder, err := makeCore(ctx, MocknetTestRepo(peers[0], mn.Host(peers[0]), conf))
+	adder, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[0], mn.Host(peers[0]), conf))
 	if err != nil {
 		return err
 	}
-	catter, err := makeCore(ctx, MocknetTestRepo(peers[1], mn.Host(peers[1]), conf))
+	catter, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[1], mn.Host(peers[1]), conf))
 	if err != nil {
 		return err
 	}
-	bootstrap, err := makeCore(ctx, MocknetTestRepo(peers[2], mn.Host(peers[2]), conf))
+	bootstrap, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[2], mn.Host(peers[2]), conf))
 	if err != nil {
 		return err
 	}

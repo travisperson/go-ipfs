@@ -90,7 +90,7 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (*IpfsNod
 
 func Online(cfg *config.Config) ConfigOption {
 	// TODO load private key
-	return func(ctx context.Context) (configuration, error) {
+	return func(ctx context.Context) (Configuration, error) {
 		if cfg == nil {
 			return nil, debugerror.Errorf("configuration required")
 		}
@@ -151,7 +151,7 @@ func Online(cfg *config.Config) ConfigOption {
 		// manage the wiring. In that scenario, this dangling function is a bit
 		// awkward.
 		go superviseConnections(ctx, peerHost, dhtRouting, peerstore, cfg.Bootstrap)
-		return &configdata{
+		return &configuration{
 			online:           true,
 			exchange:         bitswapExchange,
 			diagnoticService: diagnosticService,
@@ -160,26 +160,9 @@ func Online(cfg *config.Config) ConfigOption {
 	}
 }
 
-func (d *configdata) OnlineMode() bool              { return d.online }
-func (d *configdata) Peerstore() peer.Peerstore     { return d.peerstore }
-func (d *configdata) Blockstore() bstore.Blockstore { return d.blockstore }
-func (d *configdata) Datastore() ds.Datastore       { return d.datastore }
-func (d *configdata) Exchange() exchange.Interface  { return d.exchange }
-func (d *configdata) ID() peer.ID                   { return "" }
-
-type configdata struct {
-	online           bool
-	peerstore        peer.Peerstore
-	blockstore       bstore.Blockstore
-	datastore        ds.Datastore
-	exchange         exchange.Interface
-	diagnoticService *diag.Diagnostics
-	nameSystem       namesys.NameSystem
-}
-
 func Offline(cfg *config.Config) ConfigOption {
 	// offline exchange
-	return func(context.Context) (configuration, error) {
+	return func(context.Context) (Configuration, error) {
 		if cfg == nil {
 			return nil, debugerror.Errorf("configuration required")
 		}
@@ -187,17 +170,19 @@ func Offline(cfg *config.Config) ConfigOption {
 	}
 }
 
-type ConfigOption func(context.Context) (configuration, error)
+type ConfigOption func(context.Context) (Configuration, error)
 
-type configuration interface {
+type Configuration interface {
+	ID() peer.ID
+	Exchange() exchange.Interface
 	OnlineMode() bool
 	Peerstore() peer.Peerstore
 	Blockstore() bstore.Blockstore
-	Datastore() ds.Datastore
-	Exchange() exchange.Interface
-	ID() peer.ID
+	Datastore() ds.ThreadSafeDatastore
 	// TODO if configID == "" { return debugerror.New("Identity was not set in config (was ipfs init run?)") }
 	// TODO if len(configID) == 0 { return debugerror.New("No peer ID in config! (was ipfs init run?)") }
+
+	Bootstrap(ctx context.Context, peer peer.ID) error
 }
 
 func New(parent context.Context, f ConfigOption) (*IpfsNode, error) {

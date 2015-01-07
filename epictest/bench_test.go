@@ -1,8 +1,11 @@
 package epictest
 
-import "testing"
+import (
+	"testing"
+	core_testutil "github.com/jbenet/go-ipfs/core/testutil"
+)
 
-func benchmarkAddCat(numBytes int64, conf Config, b *testing.B) {
+func benchmarkAddCat(numBytes int64, conf core_testutil.LatencyConfig, b *testing.B) {
 
 	b.StopTimer()
 	b.SetBytes(numBytes)
@@ -16,7 +19,7 @@ func benchmarkAddCat(numBytes int64, conf Config, b *testing.B) {
 	}
 }
 
-var instant = Config{}.All_Instantaneous()
+var instant = core_testutil.LatencyConfig{}.All_Instantaneous()
 
 func BenchmarkInstantaneousAddCat1KB(b *testing.B)   { benchmarkAddCat(1*KB, instant, b) }
 func BenchmarkInstantaneousAddCat1MB(b *testing.B)   { benchmarkAddCat(1*MB, instant, b) }
@@ -29,7 +32,7 @@ func BenchmarkInstantaneousAddCat64MB(b *testing.B)  { benchmarkAddCat(64*MB, in
 func BenchmarkInstantaneousAddCat128MB(b *testing.B) { benchmarkAddCat(128*MB, instant, b) }
 func BenchmarkInstantaneousAddCat256MB(b *testing.B) { benchmarkAddCat(256*MB, instant, b) }
 
-var routing = Config{}.Routing_Slow()
+var routing = core_testutil.LatencyConfig{}.Routing_Slow()
 
 func BenchmarkRoutingSlowAddCat1MB(b *testing.B)   { benchmarkAddCat(1*MB, routing, b) }
 func BenchmarkRoutingSlowAddCat2MB(b *testing.B)   { benchmarkAddCat(2*MB, routing, b) }
@@ -42,7 +45,7 @@ func BenchmarkRoutingSlowAddCat128MB(b *testing.B) { benchmarkAddCat(128*MB, rou
 func BenchmarkRoutingSlowAddCat256MB(b *testing.B) { benchmarkAddCat(256*MB, routing, b) }
 func BenchmarkRoutingSlowAddCat512MB(b *testing.B) { benchmarkAddCat(512*MB, routing, b) }
 
-var network = Config{}.Network_NYtoSF()
+var network = core_testutil.LatencyConfig{}.Network_NYtoSF()
 
 func BenchmarkNetworkSlowAddCat1MB(b *testing.B)   { benchmarkAddCat(1*MB, network, b) }
 func BenchmarkNetworkSlowAddCat2MB(b *testing.B)   { benchmarkAddCat(2*MB, network, b) }
@@ -54,7 +57,7 @@ func BenchmarkNetworkSlowAddCat64MB(b *testing.B)  { benchmarkAddCat(64*MB, netw
 func BenchmarkNetworkSlowAddCat128MB(b *testing.B) { benchmarkAddCat(128*MB, network, b) }
 func BenchmarkNetworkSlowAddCat256MB(b *testing.B) { benchmarkAddCat(256*MB, network, b) }
 
-var hdd = Config{}.Blockstore_7200RPM()
+var hdd = core_testutil.LatencyConfig{}.Blockstore_7200RPM()
 
 func BenchmarkBlockstoreSlowAddCat1MB(b *testing.B)   { benchmarkAddCat(1*MB, hdd, b) }
 func BenchmarkBlockstoreSlowAddCat2MB(b *testing.B)   { benchmarkAddCat(2*MB, hdd, b) }
@@ -66,7 +69,7 @@ func BenchmarkBlockstoreSlowAddCat64MB(b *testing.B)  { benchmarkAddCat(64*MB, h
 func BenchmarkBlockstoreSlowAddCat128MB(b *testing.B) { benchmarkAddCat(128*MB, hdd, b) }
 func BenchmarkBlockstoreSlowAddCat256MB(b *testing.B) { benchmarkAddCat(256*MB, hdd, b) }
 
-var mixed = Config{}.Network_NYtoSF().Blockstore_SlowSSD2014().Routing_Slow()
+var mixed = core_testutil.LatencyConfig{}.Network_NYtoSF().Blockstore_SlowSSD2014().Routing_Slow()
 
 func BenchmarkMixedAddCat1MBXX(b *testing.B) { benchmarkAddCat(1*MB, mixed, b) }
 func BenchmarkMixedAddCat2MBXX(b *testing.B) { benchmarkAddCat(2*MB, mixed, b) }

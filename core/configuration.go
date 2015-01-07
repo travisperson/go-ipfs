@@ -1,4 +1,4 @@
-package epictest
+package core
 
 // important to keep as an interface to allow implementations to vary
 
@@ -8,15 +8,17 @@ import (
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
 	datastore "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
 	sync "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore/sync"
-
 	blockstore "github.com/jbenet/go-ipfs/blocks/blockstore"
 	blockservice "github.com/jbenet/go-ipfs/blockservice"
+	core_testutil "github.com/jbenet/go-ipfs/core/testutil"
+	diag "github.com/jbenet/go-ipfs/diagnostics"
 	exchange "github.com/jbenet/go-ipfs/exchange"
 	bitswap "github.com/jbenet/go-ipfs/exchange/bitswap"
 	bsnet "github.com/jbenet/go-ipfs/exchange/bitswap/network"
 	importer "github.com/jbenet/go-ipfs/importer"
 	chunk "github.com/jbenet/go-ipfs/importer/chunk"
 	merkledag "github.com/jbenet/go-ipfs/merkledag"
+	namesys "github.com/jbenet/go-ipfs/namesys"
 	host "github.com/jbenet/go-ipfs/p2p/host"
 	peer "github.com/jbenet/go-ipfs/p2p/peer"
 	path "github.com/jbenet/go-ipfs/path"
@@ -25,10 +27,7 @@ import (
 	util "github.com/jbenet/go-ipfs/util"
 	"github.com/jbenet/go-ipfs/util/datastore2"
 	delay "github.com/jbenet/go-ipfs/util/delay"
-	eventlog "github.com/jbenet/go-ipfs/util/eventlog"
 )
-
-var log = eventlog.Logger("epictest")
 
 // TODO merge with core.IpfsNode
 type core struct {
@@ -70,7 +69,7 @@ func (c *core) Add(r io.Reader) (util.Key, error) {
 	return nodeAdded.Key()
 }
 
-func makeCore(ctx context.Context, rf RepoFactory) (*core, error) {
+func MakeCore(ctx context.Context, rf RepoFactory) (*core, error) {
 	repo, err := rf(ctx)
 	if err != nil {
 		return nil, err
@@ -89,14 +88,6 @@ func makeCore(ctx context.Context, rf RepoFactory) (*core, error) {
 
 type RepoFactory func(ctx context.Context) (Configuration, error)
 
-type Configuration interface {
-	ID() peer.ID
-	Blockstore() blockstore.Blockstore
-	Exchange() exchange.Interface
-
-	Bootstrap(ctx context.Context, peer peer.ID) error
-}
-
 type configuration struct {
 	// DHT, Exchange, Network,Datastore
 	bitSwapNetwork bsnet.BitSwapNetwork
@@ -106,29 +97,22 @@ type configuration struct {
 	host           host.Host
 	dht            *dht.IpfsDHT
 	id             peer.ID
+
+	online           bool
+	peerstore        peer.Peerstore
+	diagnoticService *diag.Diagnostics
+	nameSystem       namesys.NameSystem
 }
 
-func (r *configuration) ID() peer.ID {
-	return r.id
-}
+func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error { return c.dht.Connect(ctx, p) }
+func (d *configuration) OnlineMode() bool                               { return d.online }
+func (d *configuration) Peerstore() peer.Peerstore                      { return d.peerstore }
+func (r *configuration) Blockstore() blockstore.Blockstore              { return r.blockstore }
+func (r *configuration) Datastore() datastore.ThreadSafeDatastore       { return r.datastore }
+func (r *configuration) Exchange() exchange.Interface                   { return r.exchange }
+func (r *configuration) ID() peer.ID                                    { return r.id }
 
-func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error {
-	return c.dht.Connect(ctx, p)
-}
-
-func (r *configuration) Datastore() datastore.ThreadSafeDatastore {
-	return r.datastore
-}
-
-func (r *configuration) Blockstore() blockstore.Blockstore {
-	return r.blockstore
-}
-
-func (r *configuration) Exchange() exchange.Interface {
-	return r.exchange
-}
-
-func MocknetTestRepo(p peer.ID, h host.Host, conf Config) RepoFactory {
+func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) RepoFactory {
 	return func(ctx context.Context) (Configuration, error) {
 		const kWriteCacheElems = 100
 		const alwaysSendToPeer = true
