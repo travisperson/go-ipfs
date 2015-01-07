@@ -31,9 +31,9 @@ import (
 	delay "github.com/jbenet/go-ipfs/util/delay"
 )
 
-type Config func(ctx context.Context) (Configuration, error)
+type Config func(ctx context.Context) (Components, error)
 
-type Configuration interface {
+type Components interface {
 	ID() peer.ID
 	Exchange() exchange.Interface
 	OnlineMode() bool
@@ -48,7 +48,7 @@ type Configuration interface {
 
 func Online(cfg *config.Config) Config {
 	// TODO load private key
-	return func(ctx context.Context) (Configuration, error) {
+	return func(ctx context.Context) (Components, error) {
 		if cfg == nil {
 			return nil, debugerror.Errorf("configuration required")
 		}
@@ -120,7 +120,7 @@ func Online(cfg *config.Config) Config {
 
 func Offline(cfg *config.Config) Config {
 	// offline exchange
-	return func(context.Context) (Configuration, error) {
+	return func(context.Context) (Components, error) {
 		if cfg == nil {
 			return nil, debugerror.Errorf("configuration required")
 		}
@@ -129,7 +129,7 @@ func Offline(cfg *config.Config) Config {
 }
 
 func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) Config {
-	return func(ctx context.Context) (Configuration, error) {
+	return func(ctx context.Context) (Components, error) {
 		const kWriteCacheElems = 100
 		const alwaysSendToPeer = true
 		dsDelay := delay.Fixed(conf.BlockstoreLatency)

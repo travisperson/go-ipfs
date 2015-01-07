@@ -3,7 +3,6 @@ package core
 import (
 	"io"
 
-	uio "github.com/jbenet/go-ipfs/unixfs/io"
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
 	ctxgroup "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-ctxgroup"
 	bstore "github.com/jbenet/go-ipfs/blocks/blockstore"
@@ -22,6 +21,7 @@ import (
 	path "github.com/jbenet/go-ipfs/path"
 	pin "github.com/jbenet/go-ipfs/pin"
 	routing "github.com/jbenet/go-ipfs/routing"
+	uio "github.com/jbenet/go-ipfs/unixfs/io"
 	util "github.com/jbenet/go-ipfs/util"
 	ds2 "github.com/jbenet/go-ipfs/util/datastore2"
 	eventlog "github.com/jbenet/go-ipfs/util/eventlog"
@@ -34,10 +34,9 @@ var log = eventlog.Logger("core")
 
 // IpfsNode is IPFS Core module. It represents an IPFS instance.
 type IpfsNode struct {
-	repo Configuration
+	components Components
 	// Self
 	Config     *config.Config // the node's configuration
-	Identity   peer.ID        // the local node's identity
 	PrivateKey ic.PrivKey     // the local node's private Key
 	onlineMode bool           // alternatively, offline
 
@@ -47,16 +46,16 @@ type IpfsNode struct {
 	Mounts    Mounts                        // current mount state, if any.
 
 	// Services
-	Peerstore   peer.Peerstore       // storage for other Peer instances
-	PeerHost    p2phost.Host         // the network host (server+client)
-	Routing     routing.IpfsRouting  // the routing system. recommend ipfs-dht
-	Exchange    exchange.Interface   // the block exchange + strategy (bitswap)
-	Blockstore  bstore.Blockstore    // the block store (lower level)
-	Blocks      *bserv.BlockService  // the block service, get/add blocks.
-	DAG         merkledag.DAGService // the merkle dag service, get/add objects.
-	Resolver    *path.Resolver       // the path resolution system
-	Namesys     namesys.NameSystem   // the name system, resolves paths to hashes
-	Diagnostics *diag.Diagnostics    // the diagnostics service
+	Peerstore    peer.Peerstore       // storage for other Peer instances
+	PeerHost     p2phost.Host         // the network host (server+client)
+	Routing      routing.IpfsRouting  // the routing system. recommend ipfs-dht
+	Exchange     exchange.Interface   // the block exchange + strategy (bitswap)
+	Blockstore   bstore.Blockstore    // the block store (lower level)
+	Blockservice *bserv.BlockService  // the block service, get/add blocks.
+	DAG          merkledag.DAGService // the merkle dag service, get/add objects.
+	Resolver     *path.Resolver       // the path resolution system
+	Namesys      namesys.NameSystem   // the name system, resolves paths to hashes
+	Diagnostics  *diag.Diagnostics    // the diagnostics service
 
 	ctxgroup.ContextGroup
 
@@ -105,16 +104,16 @@ func New(parent context.Context, c Config) (*IpfsNode, error) {
 		pinner = pin.NewPinner(config.Datastore(), dag)
 	}
 	node := &IpfsNode{
-		onlineMode: config.OnlineMode(),
-		Peerstore:  config.Peerstore(),
-		Exchange:   config.Exchange(),
-		Blocks:     blockService,
-		DAG:        dag,
-		Resolver:   &path.Resolver{DAG: dag},
-		Pinning:    pinner,
-		Datastore:  config.Datastore(),
+		onlineMode:   config.OnlineMode(),
+		Peerstore:    config.Peerstore(),
+		Exchange:     config.Exchange(),
+		Blockservice: blockService,
+		DAG:          dag,
+		Resolver:     &path.Resolver{DAG: dag},
+		Pinning:      pinner,
+		Datastore:    config.Datastore(),
 		// NB: config.Config is omitted
-		repo: config,
+		components: config,
 	}
 	ctxg.SetTeardown(node.teardown)
 	success = true
@@ -133,11 +132,11 @@ func (n *IpfsNode) OnlineMode() bool {
 }
 
 func (c *IpfsNode) ID() peer.ID {
-	return c.repo.ID()
+	return c.components.ID()
 }
 
 func (c *IpfsNode) Bootstrap(ctx context.Context, p peer.ID) error {
-	return c.repo.Bootstrap(ctx, p)
+	return c.components.Bootstrap(ctx, p)
 }
 
 func (c *IpfsNode) Cat(k util.Key) (io.Reader, error) {
