@@ -8,8 +8,6 @@ import (
 	b58 "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-base58"
 	ctxgroup "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-ctxgroup"
 	ma "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-multiaddr"
-
-	ds "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
 	bstore "github.com/jbenet/go-ipfs/blocks/blockstore"
 	bserv "github.com/jbenet/go-ipfs/blockservice"
 	config "github.com/jbenet/go-ipfs/config"
@@ -41,7 +39,7 @@ var log = eventlog.Logger("core")
 
 // IpfsNode is IPFS Core module. It represents an IPFS instance.
 type IpfsNode struct {
-
+	repo Configuration
 	// Self
 	Config     *config.Config // the node's configuration
 	Identity   peer.ID        // the local node's identity
@@ -66,6 +64,8 @@ type IpfsNode struct {
 	Diagnostics *diag.Diagnostics    // the diagnostics service
 
 	ctxgroup.ContextGroup
+
+	id peer.ID
 }
 
 // Mounts defines what the node's mount state is. This should
@@ -88,7 +88,7 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (*IpfsNod
 // p2p network, grandcentral, bitswap
 //
 
-func Online(cfg *config.Config) ConfigOption {
+func Online(cfg *config.Config) Config {
 	// TODO load private key
 	return func(ctx context.Context) (Configuration, error) {
 		if cfg == nil {
@@ -160,7 +160,7 @@ func Online(cfg *config.Config) ConfigOption {
 	}
 }
 
-func Offline(cfg *config.Config) ConfigOption {
+func Offline(cfg *config.Config) Config {
 	// offline exchange
 	return func(context.Context) (Configuration, error) {
 		if cfg == nil {
@@ -170,22 +170,20 @@ func Offline(cfg *config.Config) ConfigOption {
 	}
 }
 
-type ConfigOption func(context.Context) (Configuration, error)
-
 type Configuration interface {
 	ID() peer.ID
 	Exchange() exchange.Interface
 	OnlineMode() bool
 	Peerstore() peer.Peerstore
 	Blockstore() bstore.Blockstore
-	Datastore() ds.ThreadSafeDatastore
+	Datastore() ds2.ThreadSafeDatastoreCloser
 	// TODO if configID == "" { return debugerror.New("Identity was not set in config (was ipfs init run?)") }
 	// TODO if len(configID) == 0 { return debugerror.New("No peer ID in config! (was ipfs init run?)") }
 
 	Bootstrap(ctx context.Context, peer peer.ID) error
 }
 
-func New(parent context.Context, f ConfigOption) (*IpfsNode, error) {
+func New(parent context.Context, c Config) (*IpfsNode, error) {
 	ctxg := ctxgroup.WithContext(parent)
 	ctx := ctxg.Context()
 	success := false // flip to true after all sub-system inits succeed
@@ -195,7 +193,7 @@ func New(parent context.Context, f ConfigOption) (*IpfsNode, error) {
 			// TODO handle close
 		}
 	}()
-	config, err := f(ctx)
+	config, err := c(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +215,9 @@ func New(parent context.Context, f ConfigOption) (*IpfsNode, error) {
 		DAG:        dag,
 		Resolver:   &path.Resolver{DAG: dag},
 		Pinning:    pinner,
+		Datastore:  config.Datastore(),
 		// NB: config.Config is omitted
+		repo: config,
 	}
 	ctxg.SetTeardown(node.teardown)
 	success = true

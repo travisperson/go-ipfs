@@ -44,15 +44,15 @@ func RunThreeLeggedCat(data []byte, conf core_testutil.LatencyConfig) error {
 	if len(peers) < numPeers {
 		return errors.New("test initialization error")
 	}
-	adder, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[0], mn.Host(peers[0]), conf))
+	adder, err := core.New(ctx, core.MocknetTestRepo(peers[0], mn.Host(peers[0]), conf))
 	if err != nil {
 		return err
 	}
-	catter, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[1], mn.Host(peers[1]), conf))
+	catter, err := core.New(ctx, core.MocknetTestRepo(peers[1], mn.Host(peers[1]), conf))
 	if err != nil {
 		return err
 	}
-	bootstrap, err := core.MakeCore(ctx, core.MocknetTestRepo(peers[2], mn.Host(peers[2]), conf))
+	bootstrap, err := core.New(ctx, core.MocknetTestRepo(peers[2], mn.Host(peers[2]), conf))
 	if err != nil {
 		return err
 	}

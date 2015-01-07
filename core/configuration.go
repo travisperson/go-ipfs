@@ -9,7 +9,6 @@ import (
 	datastore "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore"
 	sync "github.com/jbenet/go-ipfs/Godeps/_workspace/src/github.com/jbenet/go-datastore/sync"
 	blockstore "github.com/jbenet/go-ipfs/blocks/blockstore"
-	blockservice "github.com/jbenet/go-ipfs/blockservice"
 	core_testutil "github.com/jbenet/go-ipfs/core/testutil"
 	diag "github.com/jbenet/go-ipfs/diagnostics"
 	exchange "github.com/jbenet/go-ipfs/exchange"
@@ -17,7 +16,6 @@ import (
 	bsnet "github.com/jbenet/go-ipfs/exchange/bitswap/network"
 	importer "github.com/jbenet/go-ipfs/importer"
 	chunk "github.com/jbenet/go-ipfs/importer/chunk"
-	merkledag "github.com/jbenet/go-ipfs/merkledag"
 	namesys "github.com/jbenet/go-ipfs/namesys"
 	host "github.com/jbenet/go-ipfs/p2p/host"
 	peer "github.com/jbenet/go-ipfs/p2p/peer"
@@ -26,29 +24,20 @@ import (
 	uio "github.com/jbenet/go-ipfs/unixfs/io"
 	util "github.com/jbenet/go-ipfs/util"
 	"github.com/jbenet/go-ipfs/util/datastore2"
+	ds2 "github.com/jbenet/go-ipfs/util/datastore2"
 	delay "github.com/jbenet/go-ipfs/util/delay"
 )
 
-// TODO merge with core.IpfsNode
-type core struct {
-	repo Configuration
-
-	blockService *blockservice.BlockService
-	blockstore   blockstore.Blockstore
-	dag          merkledag.DAGService
-	id           peer.ID
-}
-
-func (c *core) ID() peer.ID {
+func (c *IpfsNode) ID() peer.ID {
 	return c.repo.ID()
 }
 
-func (c *core) Bootstrap(ctx context.Context, p peer.ID) error {
+func (c *IpfsNode) Bootstrap(ctx context.Context, p peer.ID) error {
 	return c.repo.Bootstrap(ctx, p)
 }
 
-func (c *core) Cat(k util.Key) (io.Reader, error) {
-	catterdag := c.dag
+func (c *IpfsNode) Cat(k util.Key) (io.Reader, error) {
+	catterdag := c.DAG
 	nodeCatted, err := (&path.Resolver{catterdag}).ResolvePath(k.String())
 	if err != nil {
 		return nil, err
@@ -56,10 +45,10 @@ func (c *core) Cat(k util.Key) (io.Reader, error) {
 	return uio.NewDagReader(nodeCatted, catterdag)
 }
 
-func (c *core) Add(r io.Reader) (util.Key, error) {
+func (c *IpfsNode) Add(r io.Reader) (util.Key, error) {
 	nodeAdded, err := importer.BuildDagFromReader(
 		r,
-		c.dag,
+		c.DAG,
 		nil,
 		chunk.DefaultSplitter,
 	)
@@ -69,31 +58,14 @@ func (c *core) Add(r io.Reader) (util.Key, error) {
 	return nodeAdded.Key()
 }
 
-func MakeCore(ctx context.Context, rf RepoFactory) (*core, error) {
-	repo, err := rf(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	bss := &blockservice.BlockService{repo.Blockstore(), repo.Exchange()}
-	dag := merkledag.NewDAGService(bss)
-	// to make sure nothing is omitted, init each individual field and assign
-	// all at once at the bottom.
-	return &core{
-		repo:         repo,
-		blockService: bss,
-		dag:          dag,
-	}, nil
-}
-
-type RepoFactory func(ctx context.Context) (Configuration, error)
+type Config func(ctx context.Context) (Configuration, error)
 
 type configuration struct {
 	// DHT, Exchange, Network,Datastore
 	bitSwapNetwork bsnet.BitSwapNetwork
 	blockstore     blockstore.Blockstore
 	exchange       exchange.Interface
-	datastore      datastore.ThreadSafeDatastore
+	datastore      ds2.ThreadSafeDatastoreCloser
 	host           host.Host
 	dht            *dht.IpfsDHT
 	id             peer.ID
@@ -108,16 +80,16 @@ func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error { return
 func (d *configuration) OnlineMode() bool                               { return d.online }
 func (d *configuration) Peerstore() peer.Peerstore                      { return d.peerstore }
 func (r *configuration) Blockstore() blockstore.Blockstore              { return r.blockstore }
-func (r *configuration) Datastore() datastore.ThreadSafeDatastore       { return r.datastore }
+func (r *configuration) Datastore() ds2.ThreadSafeDatastoreCloser       { return r.datastore }
 func (r *configuration) Exchange() exchange.Interface                   { return r.exchange }
 func (r *configuration) ID() peer.ID                                    { return r.id }
 
-func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) RepoFactory {
+func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) Config {
 	return func(ctx context.Context) (Configuration, error) {
 		const kWriteCacheElems = 100
 		const alwaysSendToPeer = true
 		dsDelay := delay.Fixed(conf.BlockstoreLatency)
-		ds := sync.MutexWrap(datastore2.WithDelay(datastore.NewMapDatastore(), dsDelay))
+		ds := ds2.CloserWrap(sync.MutexWrap(datastore2.WithDelay(datastore.NewMapDatastore(), dsDelay)))
 
 		log.Debugf("MocknetTestRepo: %s %s %s", p, h.ID(), h)
 		dhtt := dht.NewDHT(ctx, h, ds)
