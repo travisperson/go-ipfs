@@ -1,5 +1,7 @@
 package epictest
 
+// important to keep as an interface to allow implementations to vary
+
 import (
 	"io"
 
@@ -30,7 +32,7 @@ var log = eventlog.Logger("epictest")
 
 // TODO merge with core.IpfsNode
 type core struct {
-	repo Repo
+	repo Configuration
 
 	blockService *blockservice.BlockService
 	blockstore   blockstore.Blockstore
@@ -85,9 +87,9 @@ func makeCore(ctx context.Context, rf RepoFactory) (*core, error) {
 	}, nil
 }
 
-type RepoFactory func(ctx context.Context) (Repo, error)
+type RepoFactory func(ctx context.Context) (Configuration, error)
 
-type Repo interface {
+type Configuration interface {
 	ID() peer.ID
 	Blockstore() blockstore.Blockstore
 	Exchange() exchange.Interface
@@ -95,7 +97,7 @@ type Repo interface {
 	Bootstrap(ctx context.Context, peer peer.ID) error
 }
 
-type repo struct {
+type configuration struct {
 	// DHT, Exchange, Network,Datastore
 	bitSwapNetwork bsnet.BitSwapNetwork
 	blockstore     blockstore.Blockstore
@@ -106,28 +108,28 @@ type repo struct {
 	id             peer.ID
 }
 
-func (r *repo) ID() peer.ID {
+func (r *configuration) ID() peer.ID {
 	return r.id
 }
 
-func (c *repo) Bootstrap(ctx context.Context, p peer.ID) error {
+func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error {
 	return c.dht.Connect(ctx, p)
 }
 
-func (r *repo) Datastore() datastore.ThreadSafeDatastore {
+func (r *configuration) Datastore() datastore.ThreadSafeDatastore {
 	return r.datastore
 }
 
-func (r *repo) Blockstore() blockstore.Blockstore {
+func (r *configuration) Blockstore() blockstore.Blockstore {
 	return r.blockstore
 }
 
-func (r *repo) Exchange() exchange.Interface {
+func (r *configuration) Exchange() exchange.Interface {
 	return r.exchange
 }
 
 func MocknetTestRepo(p peer.ID, h host.Host, conf Config) RepoFactory {
-	return func(ctx context.Context) (Repo, error) {
+	return func(ctx context.Context) (Configuration, error) {
 		const kWriteCacheElems = 100
 		const alwaysSendToPeer = true
 		dsDelay := delay.Fixed(conf.BlockstoreLatency)
@@ -141,7 +143,7 @@ func MocknetTestRepo(p peer.ID, h host.Host, conf Config) RepoFactory {
 			return nil, err
 		}
 		exch := bitswap.New(ctx, p, bsn, bstore, alwaysSendToPeer)
-		return &repo{
+		return &configuration{
 			bitSwapNetwork: bsn,
 			blockstore:     bstore,
 			exchange:       exch,
