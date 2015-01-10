@@ -34,16 +34,14 @@ var log = eventlog.Logger("core")
 
 // IpfsNode is IPFS Core module. It represents an IPFS instance.
 type IpfsNode struct {
-	components Components
 	// Self
-	Config     *config.Config // the node's configuration
-	PrivateKey ic.PrivKey     // the local node's private Key
-	onlineMode bool           // alternatively, offline
+	PrivateKey ic.PrivKey // the local node's private Key
+	onlineMode bool       // alternatively, offline
 
 	// Local node
 	Datastore ds2.ThreadSafeDatastoreCloser // the local datastore
 	Pinning   pin.Pinner                    // the pinning manager
-	Mounts    Mounts                        // current mount state, if any.
+	Mounts    Mounts                        `allow:"nil"` // current mount state, if any.
 
 	// Services
 	Peerstore    peer.Peerstore       // storage for other Peer instances
@@ -79,7 +77,7 @@ func NewIpfsNode(ctx context.Context, cfg *config.Config, online bool) (*IpfsNod
 	return New(ctx, Offline(cfg))
 }
 
-func New(parent context.Context, c Config) (*IpfsNode, error) {
+func New(parent context.Context, configure Config) (*IpfsNode, error) {
 	ctxg := ctxgroup.WithContext(parent)
 	ctx := ctxg.Context()
 	success := false // flip to true after all sub-system inits succeed
@@ -89,31 +87,34 @@ func New(parent context.Context, c Config) (*IpfsNode, error) {
 			// TODO handle close
 		}
 	}()
-	config, err := c(ctx)
-	if err != nil {
+	n := &IpfsNode{}
+	if err := configure(ctx, n); err != nil {
 		return nil, err
 	}
-	blockService, err := bserv.New(config.Blockstore(), config.Exchange())
+	blockService, err := bserv.New(components.Blockstore(), components.Exchange())
 	if err != nil {
 		return nil, err
 	}
 	dag := merkledag.NewDAGService(blockService)
-	pinner, err := pin.LoadPinner(config.Datastore(), dag)
+	pinner, err := pin.LoadPinner(components.Datastore(), dag)
 	if err != nil {
 		// TODO what the fuck.
-		pinner = pin.NewPinner(config.Datastore(), dag)
+		pinner = pin.NewPinner(components.Datastore(), dag)
 	}
 	node := &IpfsNode{
-		onlineMode:   config.OnlineMode(),
-		Peerstore:    config.Peerstore(),
-		Exchange:     config.Exchange(),
+		onlineMode:   components.OnlineMode(),
+		Peerstore:    components.Peerstore(),
+		Exchange:     components.Exchange(),
 		Blockservice: blockService,
 		DAG:          dag,
+		Routing:      components.Routing(),
+		PeerHost:     components.Host(),
 		Resolver:     &path.Resolver{DAG: dag},
 		Pinning:      pinner,
-		Datastore:    config.Datastore(),
+		Datastore:    components.Datastore(),
+		PrivateKey:   components.PrivateKey(),
 		// NB: config.Config is omitted
-		components: config,
+		components: components,
 	}
 	ctxg.SetTeardown(node.teardown)
 	success = true

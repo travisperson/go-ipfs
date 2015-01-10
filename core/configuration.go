@@ -31,50 +31,37 @@ import (
 	delay "github.com/jbenet/go-ipfs/util/delay"
 )
 
-type Config func(ctx context.Context) (Components, error)
-
-type Components interface {
-	ID() peer.ID
-	Exchange() exchange.Interface
-	OnlineMode() bool
-	Peerstore() peer.Peerstore
-	Blockstore() blockstore.Blockstore
-	Datastore() ds2.ThreadSafeDatastoreCloser
-	// TODO if configID == "" { return debugerror.New("Identity was not set in config (was ipfs init run?)") }
-	// TODO if len(configID) == 0 { return debugerror.New("No peer ID in config! (was ipfs init run?)") }
-
-	Bootstrap(ctx context.Context, peer peer.ID) error
-}
+type Config func(context.Context, *IpfsNode) error
 
 func Online(cfg *config.Config) Config {
 	// TODO load private key
-	return func(ctx context.Context) (Components, error) {
+	return func(ctx context.Context, n *IpfsNode) error {
 		if cfg == nil {
-			return nil, debugerror.Errorf("configuration required")
+			return debugerror.Errorf("configuration required")
 		}
 		peerID := peer.ID(b58.Decode(cfg.Identity.PeerID))
 		privateKey, err := loadPrivateKey(&cfg.Identity, peerID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		datastore, err := makeDatastore(cfg.Datastore)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		blockstore, err := blockstore.WriteCached(blockstore.NewBlockstore(datastore), kSizeBlockstoreWriteCache)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		peerstore := peer.NewPeerstore()
 		peerstore.AddPrivKey(peerID, privateKey)
 		listenAddrs, err := listenAddresses(cfg)
 		if err != nil {
-			return nil, debugerror.Wrap(err)
+			return debugerror.Wrap(err)
 		}
 		network, err := swarm.NewNetwork(ctx, listenAddrs, peerID, peerstore)
 		if err != nil {
-			return nil, debugerror.Wrap(err)
+			return debugerror.Wrap(err)
 		}
 		// TODO consider giving this function a context group so the components can be added n.AddChildGroup(network.CtxGroup())
 		peerHost := p2pbhost.New(network)
@@ -85,7 +72,7 @@ func Online(cfg *config.Config) Config {
 		//    advertising those publicly.
 		addrs, err := peerHost.Network().InterfaceListenAddresses()
 		if err != nil {
-			return nil, debugerror.Wrap(err)
+			return debugerror.Wrap(err)
 		}
 		peerstore.AddAddresses(peerID, addrs)
 
@@ -109,27 +96,22 @@ func Online(cfg *config.Config) Config {
 		// manage the wiring. In that scenario, this dangling function is a bit
 		// awkward.
 		go superviseConnections(ctx, peerHost, dhtRouting, peerstore, cfg.Bootstrap)
-		return &configuration{
-			online:           true,
-			exchange:         bitswapExchange,
-			diagnoticService: diagnosticService,
-			nameSystem:       nsys,
-		}, errors.New("TODO")
+		return errors.New("TODO")
 	}
 }
 
 func Offline(cfg *config.Config) Config {
 	// offline exchange
-	return func(context.Context) (Components, error) {
+	return func(context.Context, *IpfsNode) error {
 		if cfg == nil {
-			return nil, debugerror.Errorf("configuration required")
+			return debugerror.Errorf("configuration required")
 		}
-		return nil, errors.New("TODO")
+		return errors.New("TODO")
 	}
 }
 
 func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) Config {
-	return func(ctx context.Context) (Components, error) {
+	return func(ctx context.Context, n *IpfsNode) error {
 		const kWriteCacheElems = 100
 		const alwaysSendToPeer = true
 		dsDelay := delay.Fixed(conf.BlockstoreLatency)
@@ -140,18 +122,20 @@ func MocknetTestRepo(p peer.ID, h host.Host, conf core_testutil.LatencyConfig) C
 		bsn := bsnet.NewFromIpfsHost(h, dhtt)
 		bstore, err := blockstore.WriteCached(blockstore.NewBlockstore(ds), kWriteCacheElems)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		exch := bitswap.New(ctx, p, bsn, bstore, alwaysSendToPeer)
-		return &configuration{
-			bitSwapNetwork: bsn,
-			blockstore:     bstore,
-			exchange:       exch,
-			datastore:      ds,
-			host:           h,
-			dht:            dhtt,
-			id:             p,
-		}, nil
+		// return &configuration{
+		// 	bitSwapNetwork: bsn,
+		// 	blockstore:     bstore,
+		// 	exchange:       exch,
+		// 	privateKey:     h.Peerstore().PrivKey(p),
+		// 	datastore:      ds,
+		// 	host:           h,
+		// 	peerstore:      h.Peerstore(),
+		// 	dht:            dhtt,
+		// 	id:             p,
+		return nil
 	}
 }
 
@@ -202,12 +186,16 @@ type configuration struct {
 	peerstore        peer.Peerstore
 	diagnoticService *diag.Diagnostics
 	nameSystem       namesys.NameSystem
+
+	privateKey ic.PrivKey
 }
 
+func (c *configuration) PrivateKey() ic.PrivKey                         { return c.privateKey }
 func (c *configuration) Bootstrap(ctx context.Context, p peer.ID) error { return c.dht.Connect(ctx, p) }
-func (d *configuration) OnlineMode() bool                               { return d.online }
-func (d *configuration) Peerstore() peer.Peerstore                      { return d.peerstore }
-func (r *configuration) Blockstore() blockstore.Blockstore              { return r.blockstore }
-func (r *configuration) Datastore() ds2.ThreadSafeDatastoreCloser       { return r.datastore }
-func (r *configuration) Exchange() exchange.Interface                   { return r.exchange }
-func (r *configuration) ID() peer.ID                                    { return r.id }
+func (c *configuration) OnlineMode() bool                               { return c.online }
+func (c *configuration) Peerstore() peer.Peerstore                      { return c.peerstore }
+func (c *configuration) Host() host.Host                                { return c.host }
+func (c *configuration) Blockstore() blockstore.Blockstore              { return c.blockstore }
+func (c *configuration) Datastore() ds2.ThreadSafeDatastoreCloser       { return c.datastore }
+func (c *configuration) Exchange() exchange.Interface                   { return c.exchange }
+func (c *configuration) ID() peer.ID                                    { return c.id }

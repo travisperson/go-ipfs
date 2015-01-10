@@ -1,11 +1,50 @@
 package core
 
 import (
+	"errors"
+	"fmt"
+	"reflect"
 	"testing"
 
 	context "github.com/jbenet/go-ipfs/Godeps/_workspace/src/code.google.com/p/go.net/context"
 	config "github.com/jbenet/go-ipfs/config"
 )
+
+func TestFoo(t *testing.T) {
+	n, err := NewMockNode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := AllFieldsInitialized(n); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func AllFieldsInitialized(i interface{}) error {
+	value := reflect.ValueOf(i) // Ptr
+	struc := value.Elem()
+	for fieldIdx := 0; fieldIdx < struc.NumField(); fieldIdx++ {
+		field := struc.Field(fieldIdx)
+
+		switch field.Type().Kind() {
+		case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+			if field.IsNil() {
+				return errors.New(fmt.Sprintln(field, field.Type().Kind().String(), "is nil"))
+			}
+		case reflect.Struct:
+			typeOfIntrface := reflect.TypeOf(i) //
+			if typeOfIntrface.Elem().Field(fieldIdx).Tag.Get("allow") == "nil" {
+				continue
+			}
+			return errors.New(fmt.Sprintln(field, "is nil"))
+		case reflect.Bool:
+			continue
+		default:
+			return errors.New(fmt.Sprintln("unrecognized field:", field))
+		}
+	}
+	return nil
+}
 
 func TestInitialization(t *testing.T) {
 	ctx := context.TODO()
