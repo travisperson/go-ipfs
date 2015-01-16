@@ -85,7 +85,7 @@ func initWithDefaults(repoRoot string) error {
 
 func doInit(repoRoot string, force bool, nBitsForKeypair int) (interface{}, error) {
 
-	u.POut("initializing ipfs node at %s\n", repoRoot)
+	u.POut("Initializing ipfs node at %s\n", repoRoot)
 
 	if fsrepo.IsInitialized(repoRoot) && !force {
 		return nil, errRepoExists
@@ -136,9 +136,9 @@ func addTheWelcomeFile(conf *config.Config) error {
 
 	k, err := defnd.Key()
 	if err != nil {
-		return fmt.Errorf("failed to write test file: %s", err)
+		return fmt.Errorf("Failed to write test file: %s", err)
 	}
-	fmt.Printf("\nto get started, enter: ipfs cat %s\n", k)
+	fmt.Printf("\nTo get started, enter: ipfs cat %s\n", k)
 	return nil
 }
 
@@ -213,12 +213,12 @@ func identityConfig(nbits int) (config.Identity, error) {
 		return ident, debugerror.New("Bitsize less than 1024 is considered unsafe.")
 	}
 
-	fmt.Printf("generating key pair...")
+	fmt.Printf("Generating %v-bit RSA keypair...", nbits)
 	sk, pk, err := ci.GenerateKeyPair(ci.RSA, nbits)
 	if err != nil {
 		return ident, err
 	}
-	fmt.Printf("done\n")
+	fmt.Printf(" Done\n")
 
 	// currently storing key unencrypted. in the future we need to encrypt it.
 	// TODO(security)
@@ -233,7 +233,7 @@ func identityConfig(nbits int) (config.Identity, error) {
 		return ident, err
 	}
 	ident.PeerID = id.Pretty()
-	fmt.Printf("peer identity: %s\n", ident.PeerID)
+	fmt.Printf("Peer identity: %s\n", ident.PeerID)
 	return ident, nil
 }
 
