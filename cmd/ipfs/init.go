@@ -10,6 +10,7 @@ import (
 	cmds "github.com/jbenet/go-ipfs/commands"
 	core "github.com/jbenet/go-ipfs/core"
 	corecmds "github.com/jbenet/go-ipfs/core/commands"
+	ipns "github.com/jbenet/go-ipfs/fuse/ipns"
 	imp "github.com/jbenet/go-ipfs/importer"
 	chunk "github.com/jbenet/go-ipfs/importer/chunk"
 	ci "github.com/jbenet/go-ipfs/p2p/crypto"
@@ -111,6 +112,11 @@ func doInit(repoRoot string, force bool, nBitsForKeypair int) (interface{}, erro
 		return nil, err
 	}
 
+	err = initializeIpnsKeyspace(conf)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
@@ -140,6 +146,23 @@ func addTheWelcomeFile(conf *config.Config) error {
 	}
 	fmt.Printf("\nto get started, enter: ipfs cat %s\n", k)
 	return nil
+}
+
+func initializeIpnsKeyspace(conf *config.Config) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	nd, err := core.NewIPFSNode(ctx, core.Offline(conf))
+	if err != nil {
+		return err
+	}
+	defer nd.Close()
+	defer cancel()
+
+	err = nd.SetupOfflineRouting()
+	if err != nil {
+		return err
+	}
+
+	return ipns.InitializeKeyspace(nd, nd.PrivateKey)
 }
 
 func datastoreConfig() (*config.Datastore, error) {

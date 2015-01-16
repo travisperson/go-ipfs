@@ -32,6 +32,7 @@ import (
 	config "github.com/jbenet/go-ipfs/repo/config"
 	routing "github.com/jbenet/go-ipfs/routing"
 	dht "github.com/jbenet/go-ipfs/routing/dht"
+	offroute "github.com/jbenet/go-ipfs/routing/offline"
 	util "github.com/jbenet/go-ipfs/util"
 	ds2 "github.com/jbenet/go-ipfs/util/datastore2"
 	debugerror "github.com/jbenet/go-ipfs/util/debugerror"
@@ -122,6 +123,7 @@ func NewIPFSNode(ctx context.Context, option ConfigOption) (*IpfsNode, error) {
 	node.DAG = merkledag.NewDAGService(node.Blocks)
 	node.Pinning, err = pin.LoadPinner(node.Datastore, node.DAG)
 	if err != nil {
+		log.Warning("Failed to load pinner: %s", err)
 		node.Pinning = pin.NewPinner(node.Datastore, node.DAG)
 	}
 	node.Resolver = &path.Resolver{DAG: node.DAG}
@@ -171,7 +173,7 @@ func Standard(cfg *config.Config, online bool) ConfigOption {
 			return nil, debugerror.Wrap(err)
 		}
 
-		// setup local peer ID (private key is loaded in online setup)
+		// setup local peer ID
 		if err := n.loadID(); err != nil {
 			return nil, err
 		}
@@ -321,6 +323,17 @@ func (n *IpfsNode) loadPrivateKey() error {
 
 	n.PrivateKey = sk
 	n.Peerstore.AddPrivKey(n.Identity, n.PrivateKey)
+	n.Peerstore.AddPubKey(n.Identity, sk.GetPublic())
+	return nil
+}
+
+func (n *IpfsNode) SetupOfflineRouting() error {
+	err := n.loadPrivateKey()
+	if err != nil {
+		return err
+	}
+
+	n.Routing = offroute.NewOfflineRouter(n.Datastore, n.PrivateKey)
 	return nil
 }
 
