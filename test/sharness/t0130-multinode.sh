@@ -80,12 +80,12 @@ run_advanced_test() {
 
   test_expect_success "shut down nodes" '
     iptb stop ||
-      test_fsh tail -n +1 .iptb/*/daemon.std*
+      test_fsh tail -n +1 .iptb/benches/default/*/daemon.std*
   '
 }
 
 test_expect_success "set up /tcp testbed" '
-  iptb init -n 5 -p 0 -f --bootstrap=none
+  iptb bench create -count 5 -force -init
 '
 
 # test multiplex muxer
@@ -97,7 +97,7 @@ unset LIBP2P_MUX_PREFS
 run_advanced_test
 
 test_expect_success "set up /ws testbed" '
-  iptb init -n 5 -ws -p 0 -f --bootstrap=none
+  iptb bench create -count 5 -attr listentype,ws -force -init
 '
 
 # test multiplex muxer

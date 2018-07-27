@@ -86,7 +86,7 @@ run_advanced_test() {
 }
 
 test_expect_success "set up tcp testbed" '
-  iptb init -n 2 -p 0 -f --bootstrap=none
+  iptb bench create -count 2 -force -init
 '
 
 # test multiplex muxer

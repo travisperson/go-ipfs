@@ -8,7 +8,7 @@ export IPTB_ROOT="$(pwd)/.iptb"
 ipfsi() {
   dir="$1"
   shift
-  IPFS_PATH="$IPTB_ROOT/$dir" ipfs "$@"
+  IPFS_PATH="$IPTB_ROOT/benches/default/$dir" ipfs "$@"
 }
 
 check_has_connection() {
@@ -21,7 +21,7 @@ iptb() {
     if ! command iptb "$@"; then
         case "$1" in
             start|stop|connect)
-                test_fsh command iptb logs '*'
+                test_fsh command iptb logs
                 ;;
         esac
         return 1
@@ -36,7 +36,7 @@ startup_cluster() {
 
   if test -n "$other_args"; then
     test_expect_success "start up nodes with additional args" "
-      iptb start --args \"${other_args[@]}\"
+      iptb start -- ${other_args[@]}
     "
   else
     test_expect_success "start up nodes" '
